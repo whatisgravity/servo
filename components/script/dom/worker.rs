@@ -8,7 +8,7 @@ use dom::abstractworker::{SimpleWorkerErrorHandler, SharedRt};
 use dom::bindings::codegen::Bindings::EventHandlerBinding::EventHandlerNonNull;
 use dom::bindings::codegen::Bindings::WorkerBinding;
 use dom::bindings::codegen::Bindings::WorkerBinding::WorkerMethods;
-use dom::bindings::error::{Error, ErrorResult, Fallible};
+use dom::bindings::error::{Error, ErrorResult, Fallible, ErrorInfo};
 use dom::bindings::global::GlobalRef;
 use dom::bindings::inheritance::Castable;
 use dom::bindings::js::Root;
@@ -137,6 +137,10 @@ impl Worker {
         let worker = address.root();
         worker.upcast().fire_simple_event("error");
     }
+
+    pub fn dispatch_error(&self, _error_info: ErrorInfo) {
+        // TODO
+    }
 }
 
 impl WorkerMethods for Worker {
@@ -202,3 +206,26 @@ impl Runnable for SimpleWorkerErrorHandler<Worker> {
         Worker::dispatch_simple_error(this.addr);
     }
 }
+
+pub struct WorkerErrorHandler {
+    address: Trusted<Worker>,
+    error_info: ErrorInfo,
+}
+
+impl WorkerErrorHandler {
+    pub fn new(address: Trusted<Worker>, error_info: ErrorInfo) -> WorkerErrorHandler {
+        WorkerErrorHandler {
+            address: address,
+            error_info: error_info,
+        }
+    }
+}
+
+impl Runnable for WorkerErrorHandler {
+    fn handler(self: Box<Self>) {
+        let this = *self;
+        this.address.root().dispatch_error(this.error_info);
+    }
+}
+
+

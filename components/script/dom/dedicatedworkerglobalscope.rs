@@ -10,13 +10,16 @@ use dom::bindings::cell::DOMRefCell;
 use dom::bindings::codegen::Bindings::DedicatedWorkerGlobalScopeBinding;
 use dom::bindings::codegen::Bindings::DedicatedWorkerGlobalScopeBinding::DedicatedWorkerGlobalScopeMethods;
 use dom::bindings::codegen::Bindings::EventHandlerBinding::EventHandlerNonNull;
-use dom::bindings::error::ErrorResult;
+use dom::bindings::error::{ErrorInfo, ErrorResult};
 use dom::bindings::global::{GlobalRef, global_root_from_context};
 use dom::bindings::inheritance::Castable;
 use dom::bindings::js::{Root, RootCollection};
 use dom::bindings::reflector::Reflectable;
 use dom::bindings::str::DOMString;
 use dom::bindings::structuredclone::StructuredCloneData;
+use dom::errorevent::ErrorEvent;
+use dom::event::{Event, EventBubbles, EventCancelable};
+use dom::eventtarget::EventTarget;
 use dom::messageevent::MessageEvent;
 use dom::worker::{TrustedWorkerAddress, WorkerMessageHandler};
 use dom::workerglobalscope::WorkerGlobalScope;
@@ -338,6 +341,31 @@ impl DedicatedWorkerGlobalScope {
                 self.handle_script_event(msg);
             }
         }
+    }
+
+    /// https://html.spec.whatwg.org/multipage/#report-the-error
+    pub fn report_an_error(&self, error_info: ErrorInfo, value: HandleValue) {
+        // Steps 3-12.
+        let event = ErrorEvent::new(GlobalRef::Worker(self.upcast()),
+                                    atom!("error"),
+                                    EventBubbles::DoesNotBubble,
+                                    EventCancelable::Cancelable,
+                                    error_info.message.into(),
+                                    error_info.filename.into(),
+                                    error_info.lineno,
+                                    error_info.column,
+                                    value);
+
+        // Step 13.
+        if !event.upcast::<Event>().fire(self.upcast::<EventTarget>()) {
+            return;
+        }
+
+        let worker = self.worker.borrow().as_ref().unwrap().clone();
+        self.parent_sender
+            .send(CommonScriptMsg::RunnableMsg(WorkerEvent,
+                                               box WorkerErrorHandler::new(worker, error_info)))
+            .unwrap();
     }
 }
 

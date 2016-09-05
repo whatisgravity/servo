@@ -5,7 +5,7 @@
 use devtools_traits::{DevtoolScriptControlMsg, ScriptToDevtoolsControlMsg, WorkerId};
 use dom::bindings::codegen::Bindings::FunctionBinding::Function;
 use dom::bindings::codegen::Bindings::WorkerGlobalScopeBinding::WorkerGlobalScopeMethods;
-use dom::bindings::error::{Error, ErrorResult, Fallible, report_pending_exception};
+use dom::bindings::error::{Error, ErrorResult, Fallible, report_pending_exception, ErrorInfo};
 use dom::bindings::global::GlobalRef;
 use dom::bindings::inheritance::Castable;
 use dom::bindings::js::{JS, MutNullableHeap, Root};
@@ -450,5 +450,12 @@ impl WorkerGlobalScope {
         if let Some(ref closing) = self.closing {
             closing.store(true, Ordering::SeqCst);
         }
+    }
+
+    /// https://html.spec.whatwg.org/multipage/#report-the-error
+    pub fn report_an_error(&self, error_info: ErrorInfo, value: HandleValue) {
+        self.downcast::<DedicatedWorkerGlobalScope>()
+            .expect("Should implement report_an_error for this worker")
+            .report_an_error(error_info, value);
     }
 }
